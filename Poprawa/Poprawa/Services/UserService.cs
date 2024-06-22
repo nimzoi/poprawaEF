@@ -17,7 +17,7 @@ namespace Poprawa.Services
         public async Task<User?> GetUserByIdAsync(int userId)
         {
             return await _context.Users
-                .FirstOrDefaultAsync(u => u.UserId == userId);
+                .FirstOrDefaultAsync(u => u != null && u.UserId == userId);
         }
 
         public async Task<bool> UserHasAccessToProjectAsync(int userId, int projectId)
@@ -25,7 +25,6 @@ namespace Poprawa.Services
             return await _context.Accesses
                 .AnyAsync(a => a.UserId == userId && a.ProjectId == projectId);
         }
-
-        // Dodaj dodatkowe metody według potrzeb
+        
     }
 }

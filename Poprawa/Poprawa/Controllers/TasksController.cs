@@ -1,4 +1,5 @@
-﻿
+﻿using System;
+
 using Microsoft.AspNetCore.Mvc;
 using Poprawa.DTOs;
 using Poprawa.Models;
@@ -25,57 +26,73 @@ namespace Poprawa.Controllers
         [HttpGet]
         public async Task<IActionResult> GetTasks([FromQuery] int? projectId)
         {
-            var tasks = await _taskService.GetTasksAsync(projectId);
-            return Ok(tasks);
+            try
+            {
+                var tasks = await _taskService.GetTasksAsync(projectId);
+                return Ok(tasks);
+            }
+            catch (Exception ex)
+            {
+
+                return StatusCode(500, "Internal server error: " + ex.Message);
+            }
         }
 
         [HttpPost]
         public async Task<IActionResult> CreateTask([FromBody] CreateTaskDTO createTaskDto)
         {
-            var project = await _projectService.GetProjectByIdAsync(createTaskDto.ProjectId);
-            if (project == null)
+            try
             {
-                return NotFound("Project not found.");
-            }
-
-            var reporter = await _userService.GetUserByIdAsync(createTaskDto.ReporterId);
-            if (reporter == null)
-            {
-                return NotFound("Reporter not found.");
-            }
-
-            if (createTaskDto.AssigneeId.HasValue)
-            {
-                var assignee = await _userService.GetUserByIdAsync(createTaskDto.AssigneeId.Value);
-                if (assignee == null)
+                var project = await _projectService.GetProjectByIdAsync(createTaskDto.ProjectId);
+                if (project == null)
                 {
-                    return NotFound("Assignee not found.");
+                    return NotFound("Project not found.");
                 }
+
+                var reporter = await _userService.GetUserByIdAsync(createTaskDto.ReporterId);
+                if (reporter == null)
+                {
+                    return NotFound("Reporter not found.");
+                }
+
+                if (createTaskDto.AssigneeId.HasValue)
+                {
+                    var assignee = await _userService.GetUserByIdAsync(createTaskDto.AssigneeId.Value);
+                    if (assignee == null)
+                    {
+                        return NotFound("Assignee not found.");
+                    }
+                }
+                else
+                {
+                    createTaskDto.AssigneeId = project.DefaultAssigneeId;
+                }
+
+                if (!await _userService.UserHasAccessToProjectAsync(createTaskDto.ReporterId, createTaskDto.ProjectId) ||
+                    !await _userService.UserHasAccessToProjectAsync(createTaskDto.AssigneeId.Value, createTaskDto.ProjectId))
+                {
+                    return Forbid("Reporter or Assignee does not have access to the project.");
+                }
+
+                var newTask = new Task
+                {
+                    ProjectId = createTaskDto.ProjectId,
+                    ReporterId = createTaskDto.ReporterId,
+                    AssigneeId = createTaskDto.AssigneeId,
+                    Title = createTaskDto.Title,
+                    Description = createTaskDto.Description,
+                    CreatedAt = DateTime.UtcNow
+                };
+
+                await _taskService.CreateTaskAsync(newTask);
+
+                return CreatedAtAction(nameof(GetTasks), new { id = newTask.TaskId }, newTask);
             }
-            else
+            catch (Exception ex)
             {
-                createTaskDto.AssigneeId = project.DefaultAssigneeId;
+
+                return StatusCode(500, "Internal server error: " + ex.Message);
             }
-
-            if (!await _userService.UserHasAccessToProjectAsync(createTaskDto.ReporterId, createTaskDto.ProjectId) ||
-                !await _userService.UserHasAccessToProjectAsync(createTaskDto.AssigneeId.Value, createTaskDto.ProjectId))
-            {
-                return Forbid("Reporter or Assignee does not have access to the project.");
-            }
-
-            var newTask = new Task
-            {
-                ProjectId = createTaskDto.ProjectId,
-                ReporterId = createTaskDto.ReporterId,
-                AssigneeId = createTaskDto.AssigneeId,
-                Title = createTaskDto.Title,
-                Description = createTaskDto.Description,
-                CreatedAt = DateTime.UtcNow
-            };
-
-            await _taskService.CreateTaskAsync(newTask);
-
-            return CreatedAtAction(nameof(GetTasks), new { id = newTask.TaskId }, newTask);
         }
     }
 }

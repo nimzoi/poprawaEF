@@ -16,8 +16,8 @@ namespace Poprawa.Services
 
         public async Task<Project> GetProjectByIdAsync(int projectId)
         {
-            return await _context.Projects
-                .FirstOrDefaultAsync(p => p.ProjectId == projectId);
+            return (await _context.Projects
+                .FirstOrDefaultAsync(p => p.ProjectId == projectId))!;
         }
 
 
